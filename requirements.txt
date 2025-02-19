@@ -1,0 +1,14 @@
+streamlit
+plotly==6.0.0
+pandas
+datetime
+pillow
+numpy
+mysql-connector-python
+streamlit-extras
+streamlit-option-menu
+schedule
+tabulate
+numerize
+networkx
+matplotlib
