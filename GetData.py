@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 # Database connection details
-host = "192.168.1.200"  # MySQL server
+host = "http://keystone1.intelli.uno:9000/phpmyadmin/"  # MySQL server
 user = "unorootsrm"  # MySQL username
 password = "Onida@srm101"  # MySQL password
 database = "keystone"  #database name
