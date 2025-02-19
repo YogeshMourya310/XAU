@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 
 # Database connection details
-host = "http://keystone1.intelli.uno:9000/phpmyadmin/"  # MySQL server
+host = "keystone1.intelli.uno"
+port = 9000 
 user = "unorootsrm"  # MySQL username
 password = "Onida@srm101"  # MySQL password
-database = "keystone"  #database name
+database = "erprmwise"  #database name
 
 def fetch_data(start_date, end_date):
     conn = None  # Initialize conn to None
@@ -15,7 +16,7 @@ def fetch_data(start_date, end_date):
     try:
         # Connect to MySQL
         conn = mysql.connector.connect(
-            host=host, user=user, password=password, database=database
+            host=host,port=port, user=user, password=password, database=database
         )
         cursor = conn.cursor(dictionary=True)  # Fetch results as dictionaries
 
