@@ -3,8 +3,8 @@ import pandas as pd
 import numpy as np
 
 # Database connection details
-host = "keystone1.intelli.uno"
-port = 9000 
+host = "localhost"
+port = 3306 
 user = "unorootsrm"  # MySQL username
 password = "Onida@srm101"  # MySQL password
 database = "erprmwise"  #database name
