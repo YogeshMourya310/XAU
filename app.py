@@ -62,7 +62,7 @@ total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
 
 # Fetch Data
 with st.spinner("Fetching data... Please wait ⏳"):
-    df1,df2,df = GetData.fetch_data(start_date, end_date)  # ✅ Show loading indicator
+    df1,df2,df,d = GetData.fetch_data(start_date, end_date)  # ✅ Show loading indicator
 
 
 # Sidebar Filters
@@ -85,6 +85,10 @@ if reporting_managers:
     df_filtered = df_filtered[df_filtered["ReportingManager"].isin(reporting_managers)]
 
 def home():
+    global df_filtered
+    global df1
+    global d
+
     total_eng = df_filtered['ECode'].count()
     box1, box2, box3, box4 = st.columns(4, gap='small')
 
@@ -111,25 +115,37 @@ def home():
     # Display Data
     st.markdown("#### 📋 Data")
     with st.expander("VIEW EXCEL DATASET"):
-        styled_df = df_filtered.T.style.set_properties(**{
-            'background-color': '#F9F9F9',
-            'border': '1px solid #DDD',
-            'color': 'black',
-            'font-size': '14px',
-            'font-weight': 'bold'  # ✅ Make all text bold (including index)
-        })
-        st.write(styled_df)
+        dd = df_filtered.T  # ✅ Remove index and transpose
 
-    _, col1, col2, _ = st.columns(4)
+        # ✅ Fix column headers by making the first row the header
+        #dd.columns = dd.iloc[0]  # Set first row as column headers
+        dd = dd[0:] # Remove the first row after setting headers
+        st.write(dd)
+
+    # st.markdown("#### 📋 Data")
+    # with st.expander("VIEW EXCEL DATASET"):
+    #
+    #     dd = df1
+    #     st.write(dd)
+
+    _, col1, col2, n = st.columns(4)
+
     with col1:
-        csv = df_filtered.T.to_csv(index=True)  # Convert DataFrame to CSV text
-        st.download_button("Download filtered Data", data=csv, file_name="EngineerPerformanceReport(filtered).csv",
+        csv1 = df_filtered.T.to_csv()
+        st.download_button("Download filtered file", data=csv1, file_name="EngineerPerformanceReport.csv",
                            mime="text/csv",
-                           help="Click here to download the filtered report as a CSV file")
-    with col2:
-        csv = df.T.to_csv(index=True)  # Convert DataFrame to CSV text
-        st.download_button("Download all Data", data=csv, file_name="EngineerPerformanceReport.csv", mime="text/csv",
                            help="Click here to download the report as a CSV file")
+
+    with col2:
+        csv2 = df.to_csv(index=False)
+        st.download_button("Download file", data=csv2, file_name="EngineerPerformanceReport.csv", mime="text/csv",
+                           help="Click here to download the report as a CSV file")
+
+    with n:
+        csv2 = df2.to_string()
+        st.download_button("df2 file", data=csv2, file_name="df2.txt", mime="text/csv",
+                           help="Click here to download the report as a CSV file")
+
     st.markdown("""---""")
 
 #################### function for visuals #####################################3
@@ -269,7 +285,7 @@ def calls_closed_by_sla_compliance():
     fig = px.bar(
         df_filtered,
         x="Engineer",
-        y=["Calls Closed in 48 hrs", "Calls Closed in 24 hrs", "Calls Closed in 8 hrs","Calls Closed in 4 hrs"],
+        y=["Calls Closed > 48 hrs","Calls Closed in 48 hrs", "Calls Closed in 24 hrs", "Calls Closed in 8 hrs","Calls Closed in 4 hrs"],
         title="Wide-Form Input",
         text_auto=True)
     st.plotly_chart(fig, use_container_width=True)
