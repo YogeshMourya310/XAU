@@ -15,10 +15,11 @@ st.set_page_config(page_title="HR Analysis", page_icon=":bar_chart:", layout="wi
 st.markdown('<style>.block-container {padding-top: 1rem;}</style>', unsafe_allow_html=True)
 
 # Header Section
-image = Image.open('Ksys.png')
+imageKsys = Image.open('Ksys.png')
+errormsg = Image.open("Ashneer Memes.jpg")
 col1, col2 = st.columns([0.1, 0.9])
 with col1:
-    st.image(image, width=100)
+    st.image(imageKsys, width=100)
 
 html_title = """
     <style>
@@ -36,7 +37,7 @@ st.markdown("""---""")
 
 # Date Selection
 st.markdown("#### 📅 Select Date Range")
-col1, col2,filt = st.columns(3, gap='medium')
+col1, col2 = st.columns(2, gap='medium')
 with col1:
     date1 = st.date_input("Start Date", datetime.date(2024, 1, 1))
 with col2:
@@ -61,8 +62,23 @@ end_date = date2.strftime("%Y-%m-%d")
 total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
 
 # Fetch Data
-with st.spinner("Fetching data... Please wait ⏳"):
-    df1,df2,df,d = GetData.fetch_data(start_date, end_date)  # ✅ Show loading indicator
+with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
+    try:
+        df1, df2, df, d = GetData.fetch_data(start_date, end_date)
+
+        # ✅ Stop execution if no data is returned
+        if df is None or df.empty:
+            st.error("❌ No data found for the selected date range. Stopping execution.")
+            st.stop()  # 🛑 Stops further execution
+
+    except Exception as e:
+
+        _,msg , _ = st.columns(3)
+        with msg:
+            st.error(f"⚠️ Please Check Date Input and Try Again ⚠️")
+            st.image(errormsg, width=430)
+            st.stop()  # 🛑 Stop execution completely
+        st.stop()  # 🛑 Stop execution completely
 
 
 # Sidebar Filters
@@ -142,8 +158,8 @@ def home():
                            help="Click here to download the report as a CSV file")
 
     with n:
-        csv2 = df2.to_string()
-        st.download_button("df2 file", data=csv2, file_name="df2.txt", mime="text/csv",
+        csv2 = df1.to_csv(index=False)
+        st.download_button("df1 file", data=csv2, file_name="df1.csv", mime="text/csv",
                            help="Click here to download the report as a CSV file")
 
     st.markdown("""---""")
@@ -425,7 +441,7 @@ def sidebar():
         selected = option_menu(
             menu_title="Main Menu",
             options=["Home", "Reports"],
-            icons=["house", "eye"],
+            icons=["house", "bi-file-earmark-bar-graph"],
             menu_icon="cast",
             default_index=0
         )
