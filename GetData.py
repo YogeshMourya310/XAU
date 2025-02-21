@@ -4,7 +4,7 @@ import numpy as np
 
 # Database connection details
 host = "localhost"
-port = 3306 
+#port = "3306", # MySQL server
 user = "unorootsrm"  # MySQL username
 password = "Onida@srm101"  # MySQL password
 database = "erprmwise"  #database name
@@ -16,7 +16,7 @@ def fetch_data(start_date, end_date):
     try:
         # Connect to MySQL
         conn = mysql.connector.connect(
-            host=host,port=port, user=user, password=password, database=database
+            host=host, user=user, password=password, database=database
         )
         cursor = conn.cursor(dictionary=True)  # Fetch results as dictionaries
 
@@ -77,8 +77,13 @@ def fetch_data(start_date, end_date):
             conn.close()
 
     ##################################### data Cleaning ##########################################
+
+    # Remove rows where 'Assign_To_drm' is None (NaN) or 'Service Desk'
+    df = df.dropna(subset=['Assign_To_drm'])  # Remove NaN values
+    df = df[df['Assign_To_drm'] != 'Service Desk']  # Remove 'Service Desk' rows
+
     # remove extra spaces from columns
-    cols_to_strip = ['IncidentDate_drm', 'EmpCode_drm', 'poplocation_drm', 'Assign_To_drm']
+    cols_to_strip = ['EmpCode_drm', 'poplocation_drm', 'Assign_To_drm']
     df[cols_to_strip] = df[cols_to_strip].apply(lambda col: col.str.strip())
 
     ### for "ApprovedAmount_drm" ###
@@ -89,7 +94,10 @@ def fetch_data(start_date, end_date):
     # df['IncidentDate_drm'] = df['IncidentDate_drm'].str.strip()  # Remove extra spaces
 
     # Convert to datetime after cleaning
-    df['IncidentDate_drm'] = pd.to_datetime(df['IncidentDate_drm'], errors='coerce')
+    df['IncidentDate_drm'] = pd.to_datetime(
+        df['IncidentDate_drm'].str.strip(),
+        errors='coerce'
+    )
 
     ### for "TechCloseDateTime_drm" ###
     df['TechCloseDateTime_drm'] = df['TechCloseDateTime_drm'].str.replace(r'[^0-9 :-]', '',regex=True)  # Remove unwanted characters
@@ -113,7 +121,7 @@ def fetch_data(start_date, end_date):
     months_ = total_months if total_months <= 12 else 12
 
     # Calculate the difference in hours
-    df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] = (df['TechCloseDateTime_drm'] - df[
+    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = (df['TechCloseDateTime_drm'] - df[
         'IncidentDate_drm']).dt.total_seconds() / 3600
 
     # Split into Hours and Minutes
@@ -130,27 +138,21 @@ def fetch_data(start_date, end_date):
     # new empty dataframe
     HrData = pd.DataFrame()
 
-    # df.columns = df.columns.str.strip()
-    # HrData.columns = HrData.columns.str.strip()
     closed_df = df[(df['Status_drm'] == "Closed") | (df['Status_drm'] == "TechnicianClosed")]
     paused_df = df[df['Status_drm'] == "Paused"]
-
-    ##################################### ECODE ##########################################
-
-    # add Ecode to Hrdata
-    HrData["ECode"] = pd.DataFrame(df["EmpCode_drm"].dropna().unique())  # Remove NaN values
-    HrData["ECode"] = HrData["ECode"][HrData["ECode"] != ""]  # Remove blank values
+    ##################################### ECODE ###########################################
+    # create Engineer col
+    HrData['ECode'] = pd.DataFrame(df['EmpCode_drm'].unique())
 
     ##################################### ENGINEER NAME ##########################################
+    # Create a dictionary mapping Assign_To_drm to EmpCode_drm
+    ename_to_ecode = df.set_index('EmpCode_drm')['Assign_To_drm'].to_dict()
 
-    # Create the ECode to EName mapping dictionary
-    ecode_to_ename = df.set_index('EmpCode_drm')['Assign_To_drm'].to_dict()
-
-    # Use map to create the EName column in HrData
-    HrData['Engineer'] = HrData['ECode'].map(ecode_to_ename)
+    # Map Engineer names based on ECode
+    HrData['Engineer'] = HrData['ECode'].map(ename_to_ecode)
 
     # Sort HrData by Engineer column
-    HrData = HrData.sort_values(by="Engineer", ascending=True).reset_index(drop=True)
+    HrData = HrData.sort_values(by="Engineer", ascending=True)
 
     ##################################### POP LOCATION ##########################################
     pop_location_mapping = closed_df.groupby('EmpCode_drm')['poplocation_drm'].agg(
@@ -197,22 +199,31 @@ def fetch_data(start_date, end_date):
         'EmpCode_drm').size()
 
     # Map these counts to HrData based on EmpCode_drm
-    HrData['Total_MC_Paused'] = HrData['ECode'].map(mc_pause_counts).fillna(0).astype(int)
+    HrData['Total_MC_Calls_Paused'] = HrData['ECode'].map(mc_pause_counts).fillna(0).astype(int)
     ##################################### Calls_Closed_in_n_hrs ##########################################
 
-    callclose4 = closed_df[closed_df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] <= 4].groupby('EmpCode_drm').size()
+    callclose4 = closed_df[closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 4].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 4 hrs'] = HrData['ECode'].map(callclose4).fillna(0).astype(int)
 
-    callclose8 = closed_df[closed_df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] <= 8].groupby('EmpCode_drm').size()
+    callclose8 = closed_df[
+        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 8)
+        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] >4)
+    ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 8 hrs'] = HrData['ECode'].map(callclose8).fillna(0).astype(int)
 
-    callclose24 = closed_df[closed_df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] <= 24].groupby('EmpCode_drm').size()
+    callclose24 = closed_df[
+        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 24)
+        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 8)
+    ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 24 hrs'] = HrData['ECode'].map(callclose24).fillna(0).astype(int)
 
-    callclose48 = closed_df[closed_df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] <= 48].groupby('EmpCode_drm').size()
+    callclose48 = closed_df[
+        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 48)
+        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 24)
+    ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 48 hrs'] = HrData['ECode'].map(callclose48).fillna(0).astype(int)
 
-    callclosemore48 = closed_df[closed_df['Diff-IncidentDate_drm-IncidentDate_drm(hrs)'] > 48].groupby('EmpCode_drm').size()
+    callclosemore48 = closed_df[closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 48].groupby('EmpCode_drm').size()
     HrData['Calls Closed > 48 hrs'] = HrData['ECode'].map(callclosemore48).fillna(0).astype(int)
 
     ##################################### Total_Paused_Time ##########################################
@@ -243,8 +254,8 @@ def fetch_data(start_date, end_date):
 
     ##################################### %_Paused_call ##########################################
     HrData['%_Paused_call'] = np.where(
-        HrData['Total_MC_Paused'] != 0,
-        np.round((HrData['Total_MC_Paused'] / HrData['Total_MC_Call']) * 100),
+        HrData['Total_MC_Calls_Paused'] != 0,
+        np.round((HrData['Total_MC_Calls_Paused'] / HrData['Total_MC_Call']) * 100),
         0
     )
     HrData['%_Paused_call'] = pd.Series(HrData['%_Paused_call']).fillna(0).astype(int)
@@ -253,10 +264,10 @@ def fetch_data(start_date, end_date):
     # Extract hours from "HH:MM" format
     HrData['Paused_Hours'] = HrData['Total_Paused_Time(HH:MM)'].str.split(":").str[0].astype(int)
 
-    # Divide by Total_MC_Paused, ensuring no division by zero
+    # Divide by Total_MC_Calls_Paused, ensuring no division by zero
     HrData['Average Paused time'] = np.where(
-        HrData['Total_MC_Paused'] != 0,
-        (HrData['Paused_Hours'] / HrData['Total_MC_Paused']).fillna(0),
+        HrData['Total_MC_Calls_Paused'] != 0,
+        (HrData['Paused_Hours'] / HrData['Total_MC_Calls_Paused']).fillna(0),
         0
     ).astype(int)
 
@@ -342,6 +353,33 @@ def fetch_data(start_date, end_date):
     amount = closed_df.groupby('EmpCode_drm')['ApprovedAmount_drm'].sum()
     HrData['ApprovedAmount'] = np.round(HrData['ECode'].map(amount).fillna(0)).astype(int)
 
+    ## arrange HrData columns
+    new_order = ["Engineer","ECode","Pop_Location","ReportingManager","Total_Calls",
+                 "Average_Call_Per_Month","Total_MC_Call","SLA_MC_Violated","%_SLA_Violated",
+                 "Repeated_Calls","Average_Repeated_Call_Per_Month","No of Franchise Call",
+                 "Calls Closed in 4 hrs","Calls Closed in 8 hrs","Calls Closed in 24 hrs",
+                 "Calls Closed in 48 hrs","Calls Closed > 48 hrs","Total_MC_Calls_Paused",
+                 "%_Paused_call","Total_Paused_Time(HH:MM)","Average Paused time","ApprovedAmount"
+                 ]
+    HrData = HrData[new_order]
 
-    return df, df2,HrData
+    return df, df2,HrData ,d
 
+# import datetime
+# df1,df2,df,d = fetch_data( datetime.date(2024, 10, 1),  datetime.date(2024, 12, 31))
+# # Convert the list of dictionaries `d` into a structured format
+# hierarchy = {}
+#
+# # Process `d`, ensuring all engineers are added
+# for entry in d:
+#     for eng, rms in entry.items():
+#         hierarchy[eng] = rms  # Store engineer's RM hierarchy
+#
+# # Ensure all engineers appear in the hierarchy (even those without RMs)
+# for eng in df2["EngName"].unique():
+#     if eng not in hierarchy:
+#         hierarchy[eng] = []  # Assign an empty list if no RM exists
+#
+# # Print the hierarchy in the required format
+# for eng, rms in hierarchy.items():
+#     print({eng: rms})
