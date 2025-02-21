@@ -61,24 +61,27 @@ end_date = date2.strftime("%Y-%m-%d")
 
 total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
 
+# # Fetch Data
+# with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
+#     try:
+#         df1, df2, df, d = GetData.fetch_data(start_date, end_date)
+# 
+#         # ✅ Stop execution if no data is returned
+#         if df is None or df.empty:
+#             st.error("❌ No data found for the selected date range. Stopping execution.")
+#             st.stop()  # 🛑 Stops further execution
+# 
+#     except Exception as e:
+# 
+#         _,msg , _ = st.columns(3)
+#         with msg:
+#             st.error(f"⚠️ Please Check Date Input and Try Again ⚠️")
+#             st.image(errormsg, width=430)
+#             st.stop()  # 🛑 Stop execution completely
+#         st.stop()  # 🛑 Stop execution completely
 # Fetch Data
 with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
-    try:
         df1, df2, df, d = GetData.fetch_data(start_date, end_date)
-
-        # ✅ Stop execution if no data is returned
-        if df is None or df.empty:
-            st.error("❌ No data found for the selected date range. Stopping execution.")
-            st.stop()  # 🛑 Stops further execution
-
-    except Exception as e:
-
-        _,msg , _ = st.columns(3)
-        with msg:
-            st.error(f"⚠️ Please Check Date Input and Try Again ⚠️")
-            st.image(errormsg, width=430)
-            st.stop()  # 🛑 Stop execution completely
-        st.stop()  # 🛑 Stop execution completely
 
 
 # Sidebar Filters
