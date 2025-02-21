@@ -90,7 +90,7 @@ def fetch_data(start_date, end_date):
     df['ApprovedAmount_drm'] = df['ApprovedAmount_drm'].fillna(0)
 
     ### for "IncidentDate_drm" ###
-    df['IncidentDate_drm'] = df['IncidentDate_drm'].str.replace(r'[^0-9 :-]', '',regex=True)  # Remove unwanted characters
+    # df['IncidentDate_drm'] = df['IncidentDate_drm'].str.replace(r'[^0-9 :-]', '',regex=True)  # Remove unwanted characters
     # df['IncidentDate_drm'] = df['IncidentDate_drm'].str.strip()  # Remove extra spaces
 
     # Convert to datetime after cleaning
@@ -98,16 +98,16 @@ def fetch_data(start_date, end_date):
         df['IncidentDate_drm'].str.strip(),
         errors='coerce'
     )
-
-    ### for "TechCloseDateTime_drm" ###
-    df['TechCloseDateTime_drm'] = df['TechCloseDateTime_drm'].str.replace(r'[^0-9 :-]', '',regex=True)  # Remove unwanted characters
+    df['IncidentDate_drm'] = df['IncidentDate_drm'].fillna(pd.NaT)  # Use NaT instead of 0
+    # ### for "TechCloseDateTime_drm" ###
+    # df['TechCloseDateTime_drm'] = df['TechCloseDateTime_drm'].str.replace(r'[^0-9 :-]', '',regex=True)  # Remove unwanted characters
 
     # Convert to datetime after cleaning
     df['TechCloseDateTime_drm'] = pd.to_datetime(
         df['TechCloseDateTime_drm'].str.strip(),  # Remove extra spaces
         errors='coerce'
     )
-
+    df['TechCloseDateTime_drm'] = df['TechCloseDateTime_drm'].fillna(pd.NaT)  # Use NaT instead of 0
     # df = df.dropna(subset=['EmpCode_drm'])
 
     ##################################### data preparing ##########################################
@@ -121,9 +121,8 @@ def fetch_data(start_date, end_date):
     months_ = total_months if total_months <= 12 else 12
 
     # Calculate the difference in hours
-    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = (df['TechCloseDateTime_drm'] - df[
-        'IncidentDate_drm']).dt.total_seconds() / 3600
-
+    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = (df['TechCloseDateTime_drm'] - df['IncidentDate_drm']).dt.total_seconds() / 3600  # Convert to hours
+    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = np.floor(df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'])
     # Split into Hours and Minutes
     df[['Total_Paused_Time_Hrs', 'Total_Paused_Time_Mins']] = df['PausedTime_drm'].str.split(':', expand=True)
 
@@ -218,7 +217,7 @@ def fetch_data(start_date, end_date):
     HrData['Calls Closed in 24 hrs'] = HrData['ECode'].map(callclose24).fillna(0).astype(int)
 
     callclose48 = closed_df[
-        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 48)
+        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 48.9)
         & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 24)
     ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 48 hrs'] = HrData['ECode'].map(callclose48).fillna(0).astype(int)
