@@ -161,7 +161,7 @@ if authenticate_user():
 
     # Fetch Data
     with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
-        df1, df2, df, d = GetData2.fetch_data(start_date, end_date)
+        df1, df2, df = GetData2.fetch_data(start_date, end_date)
 
     # Sidebar Filters
     st.sidebar.header("🏂 Choose your filter:")
