@@ -290,6 +290,6 @@ def fetch_data(start_date, end_date):
     return df,df2,HrData
 
 # Example Usage
-import datetime
-df,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
-print(HrData.columns)
+# import datetime
+# df,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
+# print(HrData.columns)
