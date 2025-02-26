@@ -186,7 +186,7 @@ if authenticate_user():
     def home():
         global df_filtered
         global df1
-        global d
+        
 
         total_eng = df_filtered['ECode'].count()
         box1, box2, box3, box4 = st.columns(4, gap='small')
