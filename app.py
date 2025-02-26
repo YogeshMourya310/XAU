@@ -9,34 +9,85 @@ from numerize.numerize import numerize #exist the amount (not range amount)
 import plotly.express as px
 import plotly.graph_objects as go
 
-import GetData
+import GetData2
 
 st.set_page_config(page_title="HR Analysis", page_icon=":bar_chart:", layout="wide")
 
 #authentication
-def creds_entered():
-    if st.session_state["user"].strip() == "admin" and st.session_state["password"].strip() == "admin":
-        st.session_state["authenticated"] = True
-    else:
-        st.session_state["authenticated"]= False
-        if not st.session_state["password"]:
-            st.warning("Please enter password.")
-        elif not st.session_state["user"]:
-            st.warning("Please enter username.")
-        else:
-            st.error("Invalid Username/Password!")
+# def creds_entered():
+#     if st.session_state["user"].strip() == "admin" and st.session_state["password"].strip() == "admin":
+#         st.session_state["authenticated"] = True
+#     else:
+#         st.session_state["authenticated"]= False
+#         if not st.session_state["password"]:
+#             st.warning("Please enter password.")
+#         elif not st.session_state["user"]:
+#             st.warning("Please enter username.")
+#         else:
+#             st.error("Invalid Username/Password!")
+#
+#
+# def authenticate_user():
+#     col1, col2 = st.columns([0.6, 0.4])
+#
+#     with col2:
+#         if "authenticated" not in st.session_state:
+#             st.session_state["authenticated"] = False  # Default to False
+#
+#         username = st.text_input("Username", key="user")
+#         password = st.text_input("Password", type="password", key="password")
+#
+#         if st.button("Login"):  # ✅ Triggered only when the user clicks
+#             if username == "admin" and password == "password":  # Replace with your authentication logic
+#                 st.session_state["authenticated"] = True
+#                 st.success("✅ Authentication Successful!")
+#             else:
+#                 st.error("❌ Invalid Username or Password")
+#                 st.session_state["authenticated"] = False
+#
+#     return st.session_state["authenticated"]
+
+
 def authenticate_user():
-    if "authenticated" not in st.session_state:
-        st.text_input(label="Username : ",value="",key="user",on_change=creds_entered)
-        st.text_input(label="Password : ",value="",key="password",on_change=creds_entered)
-        return False
-    else:
+    _,col1, col2,_ = st.columns([0.05,0.3, 0.2,0.05])
+
+    if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+        with col1:
+            st.text("\n")
+            st.text("\n"*5)
+            st.markdown('<p style="font-size: 90px; font-weight: bold; font-family: Arial Black;">XAU</p>',
+                        unsafe_allow_html=True)
+
+    with col2:
+        # ✅ Ensure authentication state exists
+        if "authenticated" not in st.session_state:
+            st.session_state["authenticated"] = False
+
+        # ✅ If user is authenticated, show logout button
         if st.session_state["authenticated"]:
-            return True
-        else:
-            st.text_input(label="Username : ", value="", key="user", on_change=creds_entered)
-            st.text_input(label="Password : ", value="", key="password", on_change=creds_entered)
-            return False
+            # st.sidebar.success("✅ You are logged in!")
+            # st.success("✅ You are logged in!")
+            if st.sidebar.button("Log Out"):
+                st.session_state["authenticated"] = False  # Clear login state
+                st.rerun()  # ✅ Refresh the page to show login screen
+            return True  # ✅ User is authenticated
+
+        st.title("Login User")
+
+        # ✅ If user is not authenticated, show login form
+        username = st.text_input("", placeholder="Enter your username", key="user")
+        password = st.text_input("", placeholder="Enter your password", type="password", key="password")
+
+        if st.button("Login"):
+            if username == "admin" and password == "password123":
+                st.session_state["authenticated"] = True
+                st.success("✅ Authentication Successful!")
+                st.rerun()  # ✅ Refresh the page to load protected content
+            else:
+                st.error("❌ Invalid Username or Password")
+                st.session_state["authenticated"] = False
+
+    return False  # ✅ User is not authenticated
 
 if authenticate_user():
     # Custom CSS for stylingz
@@ -44,7 +95,7 @@ if authenticate_user():
 
     # Header Section
     imageKsys = Image.open('Ksys.png')
-    errormsg = Image.open("Ashneer Memes.jpg")
+    # errormsg = Image.open("Ashneer Memes.jpg")
     col1, col2 = st.columns([0.1, 0.9])
     with col1:
         st.image(imageKsys, width=100)
@@ -67,9 +118,9 @@ if authenticate_user():
     st.markdown("#### 📅 Select Date Range")
     col1, col2 = st.columns(2, gap='medium')
     with col1:
-        date1 = st.date_input("Start Date", datetime.date(2024, 1, 1))
+        date1 = st.date_input("Start Date", datetime.date(2024, 10, 1))
     with col2:
-        date2 = st.date_input("End Date", datetime.date(2024, 3, 31))
+        date2 = st.date_input("End Date", datetime.date(2024, 12, 31))
     # with filt:
     #     option = st.selectbox(
     #         label="select deshbord",
@@ -92,7 +143,7 @@ if authenticate_user():
     # # Fetch Data
     # with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
     #     try:
-    #         df1, df2, df, d = GetData.fetch_data(start_date, end_date)
+    #         df1, df2, df, d = GetData2.fetch_data(start_date, end_date)
     #
     #         # ✅ Stop execution if no data is returned
     #         if df is None or df.empty:
@@ -110,7 +161,7 @@ if authenticate_user():
 
     # Fetch Data
     with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
-        df1, df2, df, d = GetData.fetch_data(start_date, end_date)
+        df1, df2, df, d = GetData2.fetch_data(start_date, end_date)
 
     # Sidebar Filters
     st.sidebar.header("🏂 Choose your filter:")
@@ -185,14 +236,14 @@ if authenticate_user():
                                help="Click here to download the report as a CSV file")
 
         with col2:
-            csv2 = df.to_csv(index=False)
+            csv2 = df.T.to_csv(index=False)
             st.download_button("Download file", data=csv2, file_name="EngineerPerformanceReport.csv", mime="text/csv",
                                help="Click here to download the report as a CSV file")
 
-        with n:
-            csv2 = df1.to_csv(index=False)
-            st.download_button("df1 file", data=csv2, file_name="df1.csv", mime="text/csv",
-                               help="Click here to download the report as a CSV file")
+        # with n:
+        #     csv2 = df1.to_csv(index=False)
+        #     st.download_button("ReportingManager", data=csv2, file_name="df1.csv", mime="text/csv",
+        #                        help="Click here to download the report as a CSV file")
 
         st.markdown("""---""")
 
@@ -582,7 +633,4 @@ if authenticate_user():
     #     fig = create_bar_chart(df, "ALL ENGINEERS", "#999999")
     #
     # st.plotly_chart(fig, use_container_width=True)
-
-
-
 
