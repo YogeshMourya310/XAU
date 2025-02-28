@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import GetData as gd
+import GetData2 as gd
 from datetime import date,timedelta,datetime
 from PIL import Image
 from streamlit_extras.metric_cards import style_metric_cards
