@@ -4,7 +4,7 @@ import numpy as np
 
 # SQLite database file
 db_file = "python-keystone.db"
-password = "Keystone@sqllite" 
+password = "Keystone@sqllite"
 
 def fetch_data(start_date, end_date):
     conn = None
@@ -24,11 +24,14 @@ def fetch_data(start_date, end_date):
                 State_drm, poplocation_drm, ATADate_drm,
                 TechCloseDateTime_drm, Status_drm, resolutionflag_drm,
                 PausedTime_drm, ApprovedAmount_drm, ReportingManager_drm,
-                AssetID_drm
-            FROM drm
-            WHERE IncidentDate_drm BETWEEN ? AND ?;
+                AssetID_drm,
+                traveldistance_edtl
+            FROM dailyreportmst_drm
+            JOIN engineerdailytravellogs_edtl ON ticketid_drm=ticketid_edtl
+            WHERE IncidentDate_drm BETWEEN %s AND %s
+            AND date_edtl BETWEEN %s AND %s;
         """
-        cursor.execute(query1, (start_date, end_date))
+        cursor.execute(query1, (start_date, end_date,start_date,end_date))
         df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
 
         # Query 2: Fetch engineer details
@@ -119,6 +122,8 @@ def fetch_data(start_date, end_date):
     # ECode-Engineer Column---------------------------------------------------------------------------
     HrData['ECode'] = pd.DataFrame(df['EmpCode_drm'].unique())
     HrData['Engineer'] = HrData['ECode'].map(df.set_index('EmpCode_drm')['Assign_To_drm'].to_dict())
+    # Sort HrData by Engineer column
+    HrData = HrData.sort_values(by="Engineer", ascending=True)
 
     # Pop location mapping---------------------------------------------------------------------------
     HrData['Pop_Location'] = HrData['ECode'].map(df.groupby('EmpCode_drm')['poplocation_drm'].agg(lambda x: x.value_counts().idxmax() if not x.empty else np.nan))
@@ -275,9 +280,32 @@ def fetch_data(start_date, end_date):
     # Approved Amount per Engineer-------------------------
     HrData['ApprovedAmount'] = HrData['ECode'].map(closed_df.groupby('EmpCode_drm')['ApprovedAmount_drm'].sum()).fillna(0).astype(int)
 
+    #################### no of calls > 70 km ###################
+    # ✅ Step 1: Filter `closed_df1` where `traveldistance_edtl > 70`
+    gt70_df = closed_df1[closed_df1["traveldistance_edtl"] > 70]
+
+    # ✅ Step 2: Count occurrences of `EmpCode_drm`
+    count_df = gt70_df.groupby("EmpCode_drm")["traveldistance_edtl"].count().reset_index()
+    count_df.columns = ["ECode", "count_above_70km"]  # Renaming for easy mapping
+
+    # ✅ Step 3: Create mapping dictionary from `count_df`
+    mapping = count_df.set_index("ECode")["count_above_70km"].to_dict()
+
+    # ✅ Step 4: Use `.map()` to assign values to `HrData["ECode"]`
+    HrData["No of calls >70 Km"] = HrData["ECode"].map(mapping).fillna(0).astype(int)
+
+    ##################### Average call per month > 70 Km   ############################
+
+    HrData['Average call per month > 70 Km'] = np.where(
+        HrData['No of calls >70 Km'] != 0,
+        (HrData['No of calls >70 Km'] / months_).round().astype(int),
+        0
+    )
+
     # new order-------------------------
     new_order = ["Engineer", "ECode", "Pop_Location", "ReportingManager", "Total_Calls",
                  "Average_Call_Per_Month", "Total_MC_Call", "SLA_MC_Violated", "%_SLA_Violated",
+                 "No of calls >70 Km", "Average call per month > 70 Km",
                  "Repeated_Calls", "Average_Repeated_Call_Per_Month", "No of Franchise Call",
                  "Calls Closed in 4 hrs", "Calls Closed in 8 hrs", "Calls Closed in 24 hrs",
                  "Calls Closed in 48 hrs", "Calls Closed > 48 hrs", "Total_MC_Calls_Paused",
@@ -289,7 +317,7 @@ def fetch_data(start_date, end_date):
 
     return df,df2,HrData
 
-# Example Usage
+# # Example Usage
 # import datetime
 # df,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
 # print(HrData.columns)
