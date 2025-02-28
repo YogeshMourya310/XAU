@@ -144,6 +144,7 @@ if authenticate_user():
 
     # for issue of 12
     end_date = end_date + timedelta(days=1)
+    end_date = end_date.strftime("%Y-%m-%d")
 
     total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
     total_months+=1
