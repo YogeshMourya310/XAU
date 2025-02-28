@@ -19,20 +19,20 @@ def fetch_data(start_date, end_date):
         # Query 1: Fetch daily reports
         query1 = """
             SELECT
-                Incident_No_drm, ticketid_drm, IncidentType_drm,
-                Assign_To_drm, EmpCode_drm, IncidentDate_drm,
-                State_drm, poplocation_drm, ATADate_drm,
-                TechCloseDateTime_drm, Status_drm, resolutionflag_drm,
-                PausedTime_drm, ApprovedAmount_drm, ReportingManager_drm,
-                AssetID_drm,
-                traveldistance_edtl
-            FROM dailyreportmst_drm
-            JOIN engineerdailytravellogs_edtl ON ticketid_drm=ticketid_edtl
-            WHERE IncidentDate_drm BETWEEN %s AND %s
-            AND date_edtl BETWEEN %s AND %s;
+                drm.Incident_No_drm, drm.ticketid_drm, drm.IncidentType_drm,
+                drm.Assign_To_drm, drm.EmpCode_drm, drm.IncidentDate_drm,
+                drm.State_drm, drm.poplocation_drm, drm.ATADate_drm,
+                drm.TechCloseDateTime_drm, drm.Status_drm, drm.resolutionflag_drm,
+                drm.PausedTime_drm, drm.ApprovedAmount_drm, drm.ReportingManager_drm,
+                drm.AssetID_drm, edtl.traveldistance_edtl
+            FROM dailyreportmst_drm AS drm
+            JOIN engineerdailytravellogs_edtl AS edtl
+                ON drm.ticketid_drm = edtl.ticketid_edtl
+            WHERE drm.IncidentDate_drm BETWEEN ? AND ?
+                AND edtl.date_edtl BETWEEN ? AND ?;
         """
         cursor.execute(query1, (start_date, end_date,start_date,end_date))
-        df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
+        df1 = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
 
         # Query 2: Fetch engineer details
         query2 = """
@@ -75,81 +75,81 @@ def fetch_data(start_date, end_date):
             conn.close()
 
     ##################################### Data Cleaning ##########################################
-    df = df.dropna(subset=['Assign_To_drm'])  # Remove NaN values
-    df = df[df['Assign_To_drm'] != 'Service Desk']  # Remove 'Service Desk' rows
+    df1 = df1.dropna(subset=['Assign_To_drm'])  # Remove NaN values
+    df1 = df1[df1['Assign_To_drm'] != 'Service Desk']  # Remove 'Service Desk' rows
 
     # Remove extra spaces
     cols_to_strip = ['EmpCode_drm', 'poplocation_drm', 'Assign_To_drm']
-    df[cols_to_strip] = df[cols_to_strip].apply(lambda col: col.str.strip())
+    df1[cols_to_strip] = df1[cols_to_strip].apply(lambda col: col.str.strip())
 
     # Fill NaN values
-    df['ApprovedAmount_drm'] = df['ApprovedAmount_drm'].fillna(0)
-    df['IncidentDate_drm'] = pd.to_datetime(df['IncidentDate_drm'], errors='coerce')
-    df['TechCloseDateTime_drm'] = pd.to_datetime(df['TechCloseDateTime_drm'], errors='coerce')
+    df1['ApprovedAmount_drm'] = df1['ApprovedAmount_drm'].fillna(0)
+    df1['IncidentDate_drm'] = pd.to_datetime(df1['IncidentDate_drm'], errors='coerce')
+    df1['TechCloseDateTime_drm'] = pd.to_datetime(df1['TechCloseDateTime_drm'], errors='coerce')
 
-    df['IncidentDate_drm'] = df['IncidentDate_drm'].fillna(pd.NaT)  # Use NaT instead of 0
-    df['TechCloseDateTime_drm'] = df['TechCloseDateTime_drm'].fillna(pd.NaT)  # Use NaT instead of 0
+    df1['IncidentDate_drm'] = df1['IncidentDate_drm'].fillna(pd.NaT)  # Use NaT instead of 0
+    df1['TechCloseDateTime_drm'] = df1['TechCloseDateTime_drm'].fillna(pd.NaT)  # Use NaT instead of 0
 
     # Data Preparetion
 
     # Calculate the total months and months
-    total_months = (df['IncidentDate_drm'].max().year - df['IncidentDate_drm'].min().year) * 12 + \
-                   (df['IncidentDate_drm'].max().month - df['IncidentDate_drm'].min().month)
+    total_months = (df1['IncidentDate_drm'].max().year - df1['IncidentDate_drm'].min().year) * 12 + \
+                   (df1['IncidentDate_drm'].max().month - df1['IncidentDate_drm'].min().month)
 
     total_months += 1
     months_ = min(total_months,12)
 
     # Calculate the difference in hours
-    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = (df['TechCloseDateTime_drm'] - df[
+    df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = (df1['TechCloseDateTime_drm'] - df1[
         'IncidentDate_drm']).dt.total_seconds() / 3600  # Convert to hours
-    df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = np.floor(
-        df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'])
+    df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] = np.floor(
+        df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'])
     # Split into Hours and Minutes
-    df[['Total_Paused_Time_Hrs', 'Total_Paused_Time_Mins']] = df['PausedTime_drm'].str.split(':', expand=True)
+    df1[['Total_Paused_Time_Hrs', 'Total_Paused_Time_Mins']] = df1['PausedTime_drm'].str.split(':', expand=True)
 
     # Convert the split values to numeric (integer)
-    df['Total_Paused_Time_Hrs'] = pd.to_numeric(df['Total_Paused_Time_Hrs'], errors='coerce').fillna(0)
-    df['Total_Paused_Time_Mins'] = pd.to_numeric(df['Total_Paused_Time_Mins'], errors='coerce').fillna(0)
+    df1['Total_Paused_Time_Hrs'] = pd.to_numeric(df1['Total_Paused_Time_Hrs'], errors='coerce').fillna(0)
+    df1['Total_Paused_Time_Mins'] = pd.to_numeric(df1['Total_Paused_Time_Mins'], errors='coerce').fillna(0)
 
-    df['ApprovedAmount_drm'] = pd.to_numeric(df['ApprovedAmount_drm'], errors='coerce').fillna(0)
-    df['EmpCode_drm'] = df['EmpCode_drm'].astype(str)
+    df1['ApprovedAmount_drm'] = pd.to_numeric(df1['ApprovedAmount_drm'], errors='coerce').fillna(0)
+    df1['EmpCode_drm'] = df1['EmpCode_drm'].astype(str)
 
     ##################################### New DataFrame ##########################################
     HrData = pd.DataFrame()
-    closed_df = df[(df['Status_drm'] == "Closed") | (df['Status_drm'] == "TechnicianClosed")]
-    paused_df = df[df['Status_drm'] == "Paused"]
+    closed_df1 = df1[(df1['Status_drm'] == "Closed") | (df1['Status_drm'] == "TechnicianClosed")]
+    paused_df1 = df1[df1['Status_drm'] == "Paused"]
 
     # ECode-Engineer Column---------------------------------------------------------------------------
-    HrData['ECode'] = pd.DataFrame(df['EmpCode_drm'].unique())
-    HrData['Engineer'] = HrData['ECode'].map(df.set_index('EmpCode_drm')['Assign_To_drm'].to_dict())
+    HrData['ECode'] = pd.DataFrame(df1['EmpCode_drm'].unique())
+    HrData['Engineer'] = HrData['ECode'].map(df1.set_index('EmpCode_drm')['Assign_To_drm'].to_dict())
     # Sort HrData by Engineer column
     HrData = HrData.sort_values(by="Engineer", ascending=True)
 
     # Pop location mapping---------------------------------------------------------------------------
-    HrData['Pop_Location'] = HrData['ECode'].map(df.groupby('EmpCode_drm')['poplocation_drm'].agg(lambda x: x.value_counts().idxmax() if not x.empty else np.nan))
+    HrData['Pop_Location'] = HrData['ECode'].map(df1.groupby('EmpCode_drm')['poplocation_drm'].agg(lambda x: x.value_counts().idxmax() if not x.empty else np.nan))
 
     # Reporting manager mapping---------------------------------------------------------------------------
-    HrData['ReportingManager'] = HrData['ECode'].map(df.set_index('EmpCode_drm')['ReportingManager_drm'].to_dict())
+    HrData['ReportingManager'] = HrData['ECode'].map(df1.set_index('EmpCode_drm')['ReportingManager_drm'].to_dict())
 
     # Total Calls per engineer---------------------------------------------------------------------------
-    HrData['Total_Calls'] = HrData['ECode'].map(closed_df['EmpCode_drm'].value_counts()).fillna(0).astype(int)
+    HrData['Total_Calls'] = HrData['ECode'].map(closed_df1['EmpCode_drm'].value_counts()).fillna(0).astype(int)
 
     # Average_Call_Per_Month---------------------------------------------------------------------------
     HrData['Average_Call_Per_Month'] = np.round(HrData['Total_Calls'] / months_).fillna(0).astype(int)
 
     # Total MC Calls---------------------------------------------------------------------------
-    mc_counts = closed_df[closed_df['IncidentType_drm'] == 'MC'].groupby('EmpCode_drm').size()
+    mc_counts = closed_df1[closed_df1['IncidentType_drm'] == 'MC'].groupby('EmpCode_drm').size()
     HrData['Total_MC_Call'] = HrData['ECode'].map(mc_counts).fillna(0).astype(int)
 
     # SLA MC Violated---------------------------------------------------------------------------
-    sla_mc_counts = closed_df[(closed_df['IncidentType_drm'] == 'MC') & (closed_df['resolutionflag_drm'] == 'V')].groupby('EmpCode_drm').size()
+    sla_mc_counts = closed_df1[(closed_df1['IncidentType_drm'] == 'MC') & (closed_df1['resolutionflag_drm'] == 'V')].groupby('EmpCode_drm').size()
     HrData['SLA_MC_Violated'] = HrData['ECode'].map(sla_mc_counts).fillna(0).astype(int)
 
     # Percentage SLA Violated---------------------------------------------------------------------------
     HrData['%_SLA_Violated'] = np.where(HrData['SLA_MC_Violated'] != 0, np.round((HrData['SLA_MC_Violated'] / HrData['Total_MC_Call']) * 100), 0).astype(int)
 
     # Repeated Calls---------------------------------------------------------------------------
-    repeated_assets = df.groupby(['EmpCode_drm', 'AssetID_drm']).size().reset_index(name='count')
+    repeated_assets = df1.groupby(['EmpCode_drm', 'AssetID_drm']).size().reset_index(name='count')
     repeated_calls = repeated_assets[repeated_assets['count'] > 1].groupby('EmpCode_drm')['count'].sum()
     HrData['Repeated_Calls'] = HrData['ECode'].map(repeated_calls).fillna(0).astype(int)
 
@@ -186,7 +186,7 @@ def fetch_data(start_date, end_date):
         ploc_name = HrData.loc[HrData["Engineer"] == eng, "Pop_Location"].values
         # get poplocation
         ploc = ploc_name[0] if len(ploc_name) > 0 and pd.notna(ploc_name[0]) else None
-        fdata = df[df['poplocation_drm'] == ploc]
+        fdata = df1[df1['poplocation_drm'] == ploc]
         calls = 0
 
         entry = next((item for item in d if eng in item), None)
@@ -202,34 +202,34 @@ def fetch_data(start_date, end_date):
     HrData['No of Franchise Call'] = HrData['No of Franchise Call'].fillna(0).astype(int)
 
     # Call Close in N hrs ---------------------------------------------------------------------------
-    callclose4 = closed_df[closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 4].groupby(
+    callclose4 = closed_df1[closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 4].groupby(
         'EmpCode_drm').size()
     HrData['Calls Closed in 4 hrs'] = HrData['ECode'].map(callclose4).fillna(0).astype(int)
 
-    callclose8 = closed_df[
-        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 8)
-        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 4)
+    callclose8 = closed_df1[
+        (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 8)
+        & (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 4)
         ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 8 hrs'] = HrData['ECode'].map(callclose8).fillna(0).astype(int)
 
-    callclose24 = closed_df[
-        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 24)
-        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 8)
+    callclose24 = closed_df1[
+        (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 24)
+        & (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 8)
         ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 24 hrs'] = HrData['ECode'].map(callclose24).fillna(0).astype(int)
 
-    callclose48 = closed_df[
-        (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 48.9)
-        & (closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 24)
+    callclose48 = closed_df1[
+        (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] <= 48.9)
+        & (closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 24)
         ].groupby('EmpCode_drm').size()
     HrData['Calls Closed in 48 hrs'] = HrData['ECode'].map(callclose48).fillna(0).astype(int)
 
-    callclosemore48 = closed_df[closed_df['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 48].groupby(
+    callclosemore48 = closed_df1[closed_df1['Diff-TechCloseDateTime_drm-IncidentDate_drm(hrs)'] > 48].groupby(
         'EmpCode_drm').size()
     HrData['Calls Closed > 48 hrs'] = HrData['ECode'].map(callclosemore48).fillna(0).astype(int)
 
     # Total MC Calls Paused---------------------------------------------------------------------------
-    mc_pause_counts = df[(df['IncidentType_drm'] == 'MC') & (df['Status_drm'] == "Paused")].groupby(
+    mc_pause_counts = df1[(df1['IncidentType_drm'] == 'MC') & (df1['Status_drm'] == "Paused")].groupby(
         'EmpCode_drm').size()
 
     # Map these counts to HrData based on EmpCode_drm
@@ -241,25 +241,25 @@ def fetch_data(start_date, end_date):
                                        0).astype(int)
 
     # Total Paused Time (HH:MM)---------------------------------------------------------------------------
-    paused_mc_df = paused_df[paused_df['IncidentType_drm'] == 'MC']
+    paused_mc_df1 = paused_df1[paused_df1['IncidentType_drm'] == 'MC']
 
     # Convert hours & minutes to total seconds
-    paused_mc_df['Total_Seconds'] = (
-            paused_mc_df['Total_Paused_Time_Hrs'] * 3600 + paused_mc_df['Total_Paused_Time_Mins'] * 60
+    paused_mc_df1['Total_Seconds'] = (
+            paused_mc_df1['Total_Paused_Time_Hrs'] * 3600 + paused_mc_df1['Total_Paused_Time_Mins'] * 60
     )
 
     # Group by 'ECode' and sum total seconds
-    grouped_df = paused_mc_df.groupby('EmpCode_drm', as_index=False)['Total_Seconds'].sum()
+    grouped_df1 = paused_mc_df1.groupby('EmpCode_drm', as_index=False)['Total_Seconds'].sum()
     # # Ensure 'Total_Seconds' is numeric
 
     # Convert total seconds to hours, minutes, and seconds
-    grouped_df['Total_Hours'] = (grouped_df['Total_Seconds'] // 3600).astype(int)
-    grouped_df['Total_Minutes'] = ((grouped_df['Total_Seconds'] % 3600) // 60).astype(int)
+    grouped_df1['Total_Hours'] = (grouped_df1['Total_Seconds'] // 3600).astype(int)
+    grouped_df1['Total_Minutes'] = ((grouped_df1['Total_Seconds'] % 3600) // 60).astype(int)
 
     # Format as "HH:MM:SS"
-    # Ensure ECode is present in grouped_df before mapping
-    paused_time_mapping = grouped_df.set_index('EmpCode_drm')['Total_Hours'].astype(str).str.zfill(2) + ":" + \
-                          grouped_df.set_index('EmpCode_drm')['Total_Minutes'].astype(str).str.zfill(2)
+    # Ensure ECode is present in grouped_df1 before mapping
+    paused_time_mapping = grouped_df1.set_index('EmpCode_drm')['Total_Hours'].astype(str).str.zfill(2) + ":" + \
+                          grouped_df1.set_index('EmpCode_drm')['Total_Minutes'].astype(str).str.zfill(2)
 
     # Map and fill missing values with "00:00"
     HrData['Total_Paused_Time(HH:MM)'] = HrData['ECode'].map(paused_time_mapping).fillna("00:00")
@@ -278,7 +278,7 @@ def fetch_data(start_date, end_date):
     del HrData['Paused_Hours']
 
     # Approved Amount per Engineer-------------------------
-    HrData['ApprovedAmount'] = HrData['ECode'].map(closed_df.groupby('EmpCode_drm')['ApprovedAmount_drm'].sum()).fillna(0).astype(int)
+    HrData['ApprovedAmount'] = HrData['ECode'].map(closed_df1.groupby('EmpCode_drm')['ApprovedAmount_drm'].sum()).fillna(0).astype(int)
 
     #################### no of calls > 70 km ###################
     # ✅ Step 1: Filter `closed_df1` where `traveldistance_edtl > 70`
@@ -315,9 +315,9 @@ def fetch_data(start_date, end_date):
     # arrange HrData columns
     HrData = HrData[new_order]
 
-    return df,df2,HrData
+    return df1,df2,HrData
 
 # # Example Usage
 # import datetime
-# df,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
+# df1,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
 # print(HrData.columns)
