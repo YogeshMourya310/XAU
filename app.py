@@ -1,15 +1,13 @@
 import streamlit as st
 import pandas as pd
-import datetime
-import time
+import GetData as gd
+from datetime import date,timedelta,datetime
 from PIL import Image
 from streamlit_extras.metric_cards import style_metric_cards
 from streamlit_option_menu import option_menu
 from numerize.numerize import numerize #exist the amount (not range amount)
 import plotly.express as px
 import plotly.graph_objects as go
-
-import GetData2
 
 st.set_page_config(page_title="HR Analysis", page_icon=":bar_chart:", layout="wide")
 
@@ -72,11 +70,11 @@ def authenticate_user():
                 st.rerun()  # ✅ Refresh the page to show login screen
             return True  # ✅ User is authenticated
 
-        st.title("Login User")
+        # st.title("Login User")
 
         # ✅ If user is not authenticated, show login form
-        username = st.text_input("", placeholder="Enter your username", key="user")
-        password = st.text_input("", placeholder="Enter your password", type="password", key="password")
+        username = st.text_input("", placeholder="Enter your username", key="user") # ,label_visibility="collapsed"
+        password = st.text_input("", placeholder="Enter your password", type="password", key="password") # label_visibility="collapsed",
 
         if st.button("Login"):
             if username == "admin" and password == "password123":
@@ -118,9 +116,9 @@ if authenticate_user():
     st.markdown("#### 📅 Select Date Range")
     col1, col2 = st.columns(2, gap='medium')
     with col1:
-        date1 = st.date_input("Start Date", datetime.date(2024, 10, 1))
+        date1 = st.date_input("Start Date", date(2024, 10, 1))
     with col2:
-        date2 = st.date_input("End Date", datetime.date(2024, 12, 31))
+        date2 = st.date_input("End Date", date(2024, 12, 31))
     # with filt:
     #     option = st.selectbox(
     #         label="select deshbord",
@@ -139,11 +137,12 @@ if authenticate_user():
     end_date = date2.strftime("%Y-%m-%d")
 
     total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
-
+    # for issue of 12
+    end_date = end_date + timedelta(days=1)
     # # Fetch Data
     # with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
     #     try:
-    #         df1, df2, df, d = GetData2.fetch_data(start_date, end_date)
+    #         df1, df2, df, d = GetData.fetch_data(start_date, end_date)
     #
     #         # ✅ Stop execution if no data is returned
     #         if df is None or df.empty:
@@ -158,37 +157,39 @@ if authenticate_user():
     #             st.image(errormsg, width=430)
     #             st.stop()  # 🛑 Stop execution completely
     #         st.stop()  # 🛑 Stop execution completely
-
     # Fetch Data
     with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
-        df1, df2, df = GetData2.fetch_data(start_date, end_date)
+        df1,df2, HrData = gd.fetch_data(start_date, end_date)
 
-    # Sidebar Filters
+    # ✅ Detect if DataFrames are empty (indicating SQL failure)
+    if df1.empty and df2.empty and HrData.empty:
+            st.error("⚠️ Database connection failed! Please check MySQL and try again.")
+            st.stop()  # ✅ Prevents the app from breaking
+
+        # Sidebar Filters
     st.sidebar.header("🏂 Choose your filter:")
 
-    engineers = st.sidebar.multiselect("👷 Engineer", df["Engineer"].unique())
-    pop_locations = st.sidebar.multiselect("📍 POP Location", df["Pop_Location"].unique())
-    # incident_types = st.sidebar.multiselect("⚡ Incident Type", df["IncidentType_drm"].unique())
-    reporting_managers = st.sidebar.multiselect("👨‍💼 Reporting Manager", df["ReportingManager"].unique())
+    engineers = st.sidebar.multiselect("👷 Engineer", HrData["Engineer"].unique())
+    pop_locations = st.sidebar.multiselect("📍 POP Location", sorted(HrData["Pop_Location"].unique()))
+    reporting_managers = st.sidebar.multiselect("👨‍💼 Reporting Manager", sorted(HrData["ReportingManager"].unique()))
 
     # Apply Filters
-    df_filtered = df.copy()
+    HrData_filtered = HrData.copy()
     if engineers:
-        df_filtered = df_filtered[df_filtered["Engineer"].isin(engineers)]
+        HrData_filtered = HrData_filtered[HrData_filtered["Engineer"].isin(engineers)]
     if pop_locations:
-        df_filtered = df_filtered[df_filtered["Pop_Location"].isin(pop_locations)]
+        HrData_filtered = HrData_filtered[HrData_filtered["Pop_Location"].isin(pop_locations)]
         # if incident_types:
         #     df_filtered = df_filtered[df_filtered["IncidentType_drm"].isin(incident_types)]
     if reporting_managers:
-        df_filtered = df_filtered[df_filtered["ReportingManager"].isin(reporting_managers)]
+        HrData_filtered = HrData_filtered[HrData_filtered["ReportingManager"].isin(reporting_managers)]
 
 
     def home():
-        global df_filtered
+        global HrData_filtered
         global df1
-        
 
-        total_eng = df_filtered['ECode'].count()
+        total_eng = HrData_filtered['ECode'].count()
         box1, box2, box3, box4 = st.columns(4, gap='small')
 
         with box1:
@@ -199,7 +200,7 @@ if authenticate_user():
 
         with box3:
             st.metric(label="ApproveAmount",
-                      value=numerize(sum(df_filtered['ApprovedAmount'])),
+                      value=numerize(sum(HrData_filtered['ApprovedAmount'])),
                       help="Total approved ammount")
         with box4:
             st.metric(label="demo", value=0)
@@ -214,7 +215,7 @@ if authenticate_user():
         # Display Data
         st.markdown("#### 📋 Data")
         with st.expander("VIEW EXCEL DATASET"):
-            dd = df_filtered.T  # ✅ Remove index and transpose
+            dd = HrData_filtered.T  # ✅ Remove index and transpose
 
             # ✅ Fix column headers by making the first row the header
             # dd.columns = dd.iloc[0]  # Set first row as column headers
@@ -228,16 +229,16 @@ if authenticate_user():
         #     st.write(dd)
 
         _, col1, col2, n = st.columns(4)
-
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         with col1:
-            csv1 = df_filtered.T.to_csv()
-            st.download_button("Download filtered file", data=csv1, file_name="EngineerPerformanceReport.csv",
+            csv1 = HrData_filtered.T.to_csv()
+            st.download_button("Download filtered file", data=csv1, file_name=f"EngineerPerformanceReport_{timestamp}.csv",
                                mime="text/csv",
                                help="Click here to download the report as a CSV file")
 
         with col2:
-            csv2 = df.T.to_csv(index=False)
-            st.download_button("Download file", data=csv2, file_name="EngineerPerformanceReport.csv", mime="text/csv",
+            csv2 = HrData.T.to_csv(index=False)
+            st.download_button("Download file", data=csv2, file_name=f"AllEngineerPerformanceReport_{timestamp}.csv", mime="text/csv",
                                help="Click here to download the report as a CSV file")
 
         # with n:
@@ -386,7 +387,7 @@ if authenticate_user():
 
     def calls_closed_by_sla_compliance():
         fig = px.bar(
-            df_filtered,
+            HrData_filtered,
             x="Engineer",
             y=["Calls Closed > 48 hrs", "Calls Closed in 48 hrs", "Calls Closed in 24 hrs", "Calls Closed in 8 hrs",
                "Calls Closed in 4 hrs"],
@@ -401,7 +402,7 @@ if authenticate_user():
         This visualization helps understand the consistency of engineers in handling calls.
         :return:
         """
-        fig = px.scatter(df, x="Total_Calls", y="Average_Call_Per_Month",
+        fig = px.scatter(HrData, x="Total_Calls", y="Average_Call_Per_Month",
                          color="ReportingManager", hover_data=['Engineer', 'Pop_Location'],
                          title='Total Calls vs Average Calls Per Month')
         st.plotly_chart(fig, use_container_width=True)
@@ -414,7 +415,7 @@ if authenticate_user():
         highlighting who needs attention regarding service level adherence.
         :return:
         """
-        fig = px.bar(df, x="Engineer", y="%_SLA_Violated",
+        fig = px.bar(HrData, x="Engineer", y="%_SLA_Violated",
                      color="ReportingManager",
                      title='SLA Violation Rate by Engineer',
                      labels={'%_SLA_Violated': 'SLA Violation Rate (%)'})
@@ -433,7 +434,7 @@ if authenticate_user():
         fig = go.Figure()
 
         for category in categories:
-            fig.add_trace(go.Bar(x=df['Engineer'], y=df[category], name=category))
+            fig.add_trace(go.Bar(x=HrData['Engineer'], y=HrData[category], name=category))
 
         fig.update_layout(
             title='Calls Closed Within Timeframes by Engineer',
@@ -452,7 +453,7 @@ if authenticate_user():
         :return:
         '''
         fig = px.histogram(
-            df,
+            HrData,
             x="ApprovedAmount",
             nbins=30,
             title="Distribution of Approved Amounts for Engineers",
@@ -488,8 +489,8 @@ if authenticate_user():
         st.markdown("#### 📊 Engineer Performance Summary Dashboard")
         # ------------------------------------------------------------------------------------------------
         # Sort Data for Top 5 and Bottom 5 Engineers
-        Top5 = df_filtered[["Engineer", "Total_Calls"]].sort_values(by="Total_Calls", ascending=False).head(5)
-        bottom5 = df_filtered[["Engineer", "Total_Calls"]].sort_values(by="Total_Calls").head(5)
+        Top5 = HrData_filtered[["Engineer", "Total_Calls"]].sort_values(by="Total_Calls", ascending=False).head(5)
+        bottom5 = HrData_filtered[["Engineer", "Total_Calls"]].sort_values(by="Total_Calls").head(5)
 
         # ✅ Create Bar Charts
         fig_top5 = create_bar_chart(Top5, "TOP 5 ENGINEERS", "#ff4b4b", reverse_x=False)
@@ -499,7 +500,7 @@ if authenticate_user():
 
         # Fetch top-bottom chart
         with st.spinner("Loading bar Chart... Please wait ⏳"):
-            if df_filtered.empty:
+            if HrData_filtered.empty:
                 st.warning("No data available for the selected city and engineer.")
             else:
                 left.plotly_chart(fig_top5, use_container_width=True)
@@ -516,7 +517,7 @@ if authenticate_user():
             total_calls_vs_average_call_per_month()
             # sla_violation_rate()
             # calls_closed_within_timeframes()
-            treemap(df)
+            treemap(HrData)
 
         # option = st.selectbox(
         #     label=  "select deshbord",
@@ -628,7 +629,7 @@ if authenticate_user():
     #     fig = create_bar_chart(top5, "TOP 5 ENGINEERS", "#fc2c03")
     # elif option == "Bottom Engineers":
     #     bottom5 = df.sort_values(by="Total_Calls", ascending=True).head(5)
-    #     fig = create_bar_chart(bottom5, "BOTTOM 5 ENGINEERS", "#0083B8")
+    #     fig = create_bar_chart(bottom5, "BOTTOM 5 ENGdfINEERS", "#0083B8")
     # else:
     #     fig = create_bar_chart(df, "ALL ENGINEERS", "#999999")
     #
