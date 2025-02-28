@@ -136,9 +136,17 @@ if authenticate_user():
     start_date = date1.strftime("%Y-%m-%d")
     end_date = date2.strftime("%Y-%m-%d")
 
-    total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
+    # Convert `end_date` from string to `datetime` object
+    end_date = datetime.strptime(end_date, "%Y-%m-%d")  # ✅ Convert string to datetime
+
+    # Now add 1 day
+    end_date = end_date + timedelta(days=1)
+
     # for issue of 12
     end_date = end_date + timedelta(days=1)
+
+    total_months = (date2.year - date1.year) * 12 + (date2.month - date1.month)
+    total_months+=1
     # # Fetch Data
     # with st.spinner("Fetching data... Please wait ⏳"):  # ✅ Show loading indicator
     #     try:
@@ -193,7 +201,7 @@ if authenticate_user():
         box1, box2, box3, box4 = st.columns(4, gap='small')
 
         with box1:
-            st.metric(label="Months", value=total_months + 1)
+            st.metric(label="Months", value=total_months)
 
         with box2:
             st.metric(label="Engineers", value=total_eng)
