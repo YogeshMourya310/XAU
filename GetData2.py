@@ -2,6 +2,14 @@ import sqlite3
 import pandas as pd
 import numpy as np
 
+# import gdown
+#
+# file_id = "1abcXYZ12345"  # 🔄 Replace with your actual file ID
+# output_file = "mydata.db"  # 🔄 Rename as needed
+#
+# gdown.download(f"https://drive.google.com/uc?id={file_id}", output_file, quiet=False)
+
+
 # SQLite database file
 db_file = "python-keystone.db"
 
@@ -89,6 +97,8 @@ def fetch_data(start_date, end_date):
     df1['IncidentDate_drm'] = df1['IncidentDate_drm'].fillna(pd.NaT)  # Use NaT instead of 0
     df1['TechCloseDateTime_drm'] = df1['TechCloseDateTime_drm'].fillna(pd.NaT)  # Use NaT instead of 0
 
+    df1["traveldistance_edtl"] = pd.to_numeric(df1["traveldistance_edtl"], errors="coerce")
+
     # Data Preparetion
 
     # Calculate the total months and months
@@ -129,7 +139,7 @@ def fetch_data(start_date, end_date):
 
     # Reporting manager mapping---------------------------------------------------------------------------
     HrData['ReportingManager'] = HrData['ECode'].map(df1.set_index('EmpCode_drm')['ReportingManager_drm'].to_dict())
-
+    HrData['ReportingManager'] = HrData['ReportingManager'].fillna("Unknow")
     # Total Calls per engineer---------------------------------------------------------------------------
     HrData['Total_Calls'] = HrData['ECode'].map(closed_df1['EmpCode_drm'].value_counts()).fillna(0).astype(int)
 
