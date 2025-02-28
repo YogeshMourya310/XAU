@@ -4,17 +4,16 @@ import numpy as np
 
 # SQLite database file
 db_file = "python-keystone.db"
-password = "Keystone@sqllite"
 
 def fetch_data(start_date, end_date):
     conn = None
     cursor = None
 
     try:
-        # Connect to SQLite with encryption
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
-        cursor.execute(f"PRAGMA key = '{password}';")  # Set encryption key
+        print("✅ Successfully connected to the SQLite database.")
+        print(f"Fetching data from {start_date} to {end_date}")
 
         # Query 1: Fetch daily reports
         query1 = """
@@ -25,15 +24,15 @@ def fetch_data(start_date, end_date):
                 drm.TechCloseDateTime_drm, drm.Status_drm, drm.resolutionflag_drm,
                 drm.PausedTime_drm, drm.ApprovedAmount_drm, drm.ReportingManager_drm,
                 drm.AssetID_drm, edtl.traveldistance_edtl
-            FROM dailyreportmst_drm AS drm
-            JOIN engineerdailytravellogs_edtl AS edtl
+            FROM drm
+            JOIN edtl
                 ON drm.ticketid_drm = edtl.ticketid_edtl
             WHERE drm.IncidentDate_drm BETWEEN ? AND ?
                 AND edtl.date_edtl BETWEEN ? AND ?;
         """
         cursor.execute(query1, (start_date, end_date,start_date,end_date))
         df1 = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
-
+        print(f"✅ df1 Rows: {len(df1)}")
         # Query 2: Fetch engineer details
         query2 = """
             SELECT 
@@ -63,10 +62,10 @@ def fetch_data(start_date, end_date):
         """
         cursor.execute(query2)
         df2 = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
-
+        print(f"✅ df2 Rows: {len(df2)}")
     except sqlite3.Error as e:
         print(f"Error: {e}")
-        return None, None
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame() # Prevent unpacking errors
 
     finally:
         if cursor:
@@ -320,4 +319,4 @@ def fetch_data(start_date, end_date):
 # # Example Usage
 # import datetime
 # df1,df2,HrData = fetch_data(datetime.date(2024, 10, 1), datetime.date(2024, 12, 31))
-# print(HrData.columns)
+# # print(HrData.columns)
